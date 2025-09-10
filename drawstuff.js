@@ -370,6 +370,15 @@ function drawRandPixelsInInputBoxes(context) {
     var w = context.canvas.width;
     var h = context.canvas.height;
     var imagedata = context.createImageData(w,h);
+
+	// ✅ initialize black background
+    for (let i = 0; i < imagedata.data.length; i += 4) {
+        imagedata.data[i]   = 0;
+        imagedata.data[i+1] = 0;
+        imagedata.data[i+2] = 0;
+        imagedata.data[i+3] = 255;
+    }
+
     const PIXEL_DENSITY = 0.1;
     var numCanvasPixels = (w*h)*PIXEL_DENSITY; 
     
