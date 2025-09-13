@@ -426,8 +426,8 @@ function drawRandPixelsInInputBoxes(context) {
                 }
 
                 if (hitBox) {
-                    // Blinn–Phong shading
-                    let N = hitNormal;
+				    // Blinn–Phong shading
+				    let N = hitNormal;
 				    let L = normalize({x:light.x-hitPoint.x, y:light.y-hitPoint.y, z:light.z-hitPoint.z});
 				    let V = normalize({x:eye.x-hitPoint.x, y:eye.y-hitPoint.y, z:eye.z-hitPoint.z});
 				    let H = normalize({x:L.x+V.x, y:L.y+V.y, z:L.z+V.z});
@@ -450,7 +450,8 @@ function drawRandPixelsInInputBoxes(context) {
 				    imagedata.data[idx+1] = Math.min(255,g);
 				    imagedata.data[idx+2] = Math.min(255,b);
 				    imagedata.data[idx+3] = 255;
-                }
+				}
+
             }
         }
         context.putImageData(imagedata, 0, 0);
