@@ -442,41 +442,69 @@ function drawRandPixelsInInputBoxes(context) {
 
     if (inputBoxes != String.null) { 
         var n = inputBoxes.length;
-        var eye = {x:0.5, y:0.5, z:-1.0}; // camera at center, looking forward
+        var eye = {x:0.5, y:0.5, z:-1.0}; // camera position
+        var light = {x:0.5, y:1.0, z:-0.5}; // light position above scene
+        var ka = 0.1, kd = 0.7, ks = 0.2, shininess = 20;
+
+        // normalize light direction
+        function normalize(v) {
+            let len = Math.sqrt(v.x*v.x + v.y*v.y + v.z*v.z);
+            return {x:v.x/len, y:v.y/len, z:v.z/len};
+        }
+
+        // dot product
+        function dot(a,b) { return a.x*b.x + a.y*b.y + a.z*b.z; }
 
         // Loop over every pixel
         for (let py = 0; py < h; py++) {
             for (let px = 0; px < w; px++) {
                 
-                // convert to normalized [0,1], flip y-axis
+                // normalized coords [0,1], flip y-axis
                 let ndcX = px / w;
                 let ndcY = 1 - (py / h);
 
-                // ray direction from eye through pixel
+                // ray direction
                 let dx = ndcX - eye.x;
                 let dy = ndcY - eye.y;
-                let dz = 0 - eye.z; 
+                let dz = 0 - eye.z;
                 let len = Math.sqrt(dx*dx + dy*dy + dz*dz);
                 dx /= len; dy /= len; dz /= len;
 
                 let closestT = Infinity;
-                let hitColor = null;
+                let hitBox = null;
+                let hitPoint = null;
+                let hitNormal = null;
 
-                // test against each box
+                // check each box
                 for (let b=0; b<n; b++) {
                     let box = inputBoxes[b];
-                    let t = rayIntersectBox(eye, {x:dx,y:dy,z:dz}, box);
-                    if (t !== null && t < closestT) {
-                        closestT = t;
-                        hitColor = box.diffuse;
+                    let result = rayIntersectBox(eye, {x:dx,y:dy,z:dz}, box);
+                    if (result && result.t < closestT) {
+                        closestT = result.t;
+                        hitBox = box;
+                        hitPoint = result.point;
+                        hitNormal = result.normal;
                     }
                 }
 
-                if (hitColor) {
+                if (hitBox) {
+                    // Blinn–Phong shading
+                    let N = hitNormal;
+                    let L = normalize({x:light.x-hitPoint.x, y:light.y-hitPoint.y, z:light.z-hitPoint.z});
+                    let V = normalize({x:eye.x-hitPoint.x, y:eye.y-hitPoint.y, z:eye.z-hitPoint.z});
+                    let H = normalize({x:L.x+V.x, y:L.y+V.y, z:L.z+V.z});
+
+                    let diff = Math.max(dot(N,L),0);
+                    let spec = Math.pow(Math.max(dot(N,H),0), shininess);
+
+                    let r = hitBox.diffuse[0]*255*(ka + kd*diff + ks*spec);
+                    let g = hitBox.diffuse[1]*255*(ka + kd*diff + ks*spec);
+                    let b = hitBox.diffuse[2]*255*(ka + kd*diff + ks*spec);
+
                     let idx = (py*w + px) * 4;
-                    imagedata.data[idx]   = Math.floor(hitColor[0]*255);
-                    imagedata.data[idx+1] = Math.floor(hitColor[1]*255);
-                    imagedata.data[idx+2] = Math.floor(hitColor[2]*255);
+                    imagedata.data[idx]   = Math.min(255,r);
+                    imagedata.data[idx+1] = Math.min(255,g);
+                    imagedata.data[idx+2] = Math.min(255,b);
                     imagedata.data[idx+3] = 255;
                 }
             }
@@ -484,29 +512,43 @@ function drawRandPixelsInInputBoxes(context) {
         context.putImageData(imagedata, 0, 0);
     }
 
-    // helper: ray-box intersection
+    // ray-box intersection with normal output
     function rayIntersectBox(rayOrigin, rayDir, box) {
-        let tmin = (box.lx - rayOrigin.x) / rayDir.x;
-        let tmax = (box.rx - rayOrigin.x) / rayDir.x;
-        if (tmin > tmax) [tmin, tmax] = [tmax, tmin];
+        let tmin = -Infinity, tmax = Infinity;
+        let hitNormal = null;
 
-        let tymin = (box.by - rayOrigin.y) / rayDir.y;
-        let tymax = (box.ty - rayOrigin.y) / rayDir.y;
-        if (tymin > tymax) [tymin, tymax] = [tymax, tymin];
+        function checkSlab(lo, hi, origin, dir, axis) {
+            let t1 = (lo - origin) / dir;
+            let t2 = (hi - origin) / dir;
+            let tn = null;
+            if (t1 > t2) [t1,t2] = [t2,t1];
+            if (t1 > tmin && t1 > 0) {
+                tn = {x:0,y:0,z:0};
+                tn[axis] = (origin + t1*dir < lo+hi ? -1 : 1);
+            }
+            return [t1,t2,tn];
+        }
 
-        if ((tmin > tymax) || (tymin > tmax)) return null;
-        if (tymin > tmin) tmin = tymin;
-        if (tymax < tmax) tmax = tymax;
+        let tx = checkSlab(box.lx, box.rx, rayOrigin.x, rayDir.x, "x");
+        let ty = checkSlab(box.by, box.ty, rayOrigin.y, rayDir.y, "y");
+        let tz = checkSlab(box.fz, box.rz, rayOrigin.z, rayDir.z, "z");
 
-        let tzmin = (box.fz - rayOrigin.z) / rayDir.z;
-        let tzmax = (box.rz - rayOrigin.z) / rayDir.z;
-        if (tzmin > tzmax) [tzmin, tzmax] = [tzmax, tzmin];
+        tmin = Math.max(tx[0], ty[0], tz[0]);
+        tmax = Math.min(tx[1], ty[1], tz[1]);
+        if (tmax < tmin || tmax < 0) return null;
 
-        if ((tmin > tzmax) || (tzmin > tmax)) return null;
-        if (tzmin > tmin) tmin = tzmin;
-        if (tzmax < tmax) tmax = tzmax;
+        // pick normal from slab that defines tmin
+        if (tmin === tx[0]) hitNormal = {x:(rayDir.x>0?-1:1), y:0, z:0};
+        else if (tmin === ty[0]) hitNormal = {x:0, y:(rayDir.y>0?-1:1), z:0};
+        else hitNormal = {x:0, y:0, z:(rayDir.z>0?-1:1)};
 
-        return tmin >= 0 ? tmin : null;
+        let hitPoint = {
+            x: rayOrigin.x + tmin*rayDir.x,
+            y: rayOrigin.y + tmin*rayDir.y,
+            z: rayOrigin.z + tmin*rayDir.z
+        };
+
+        return {t: tmin, point: hitPoint, normal: hitNormal};
     }
 }
 
