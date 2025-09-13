@@ -43,19 +43,24 @@ class Color {
 
 /* utility functions */
 function getInputLights() {
-    const INPUT_LIGHTS_URL = "https://ncsucgclass.github.io/prog1/lights.json";
-    var httpReq = new XMLHttpRequest();
-    httpReq.open("GET",INPUT_LIGHTS_URL,false);
-    httpReq.send(null);
-    var startTime = Date.now();
-    while ((httpReq.status !== 200) && (httpReq.readyState !== XMLHttpRequest.DONE)) {
-        if ((Date.now()-startTime) > 3000) break;
-    }
-    if ((httpReq.status !== 200) || (httpReq.readyState !== XMLHttpRequest.DONE)) {
-        console.log("Unable to open input lights file!");
-        return String.null;
-    } else
-        return JSON.parse(httpReq.response);
+    // const INPUT_LIGHTS_URL = "https://ncsucgclass.github.io/prog1/lights.json";
+    // var httpReq = new XMLHttpRequest();
+    // httpReq.open("GET",INPUT_LIGHTS_URL,false);
+    // httpReq.send(null);
+    // var startTime = Date.now();
+    // while ((httpReq.status !== 200) && (httpReq.readyState !== XMLHttpRequest.DONE)) {
+    //     if ((Date.now()-startTime) > 3000) break;
+    // }
+    // if ((httpReq.status !== 200) || (httpReq.readyState !== XMLHttpRequest.DONE)) {
+    //     console.log("Unable to open input lights file!");
+    //     return String.null;
+    // } else
+    //     return JSON.parse(httpReq.response);
+	const light = [
+        {"x": -0.5, "y": 1.5, "z": -0.5, "ambient": [1,1,1], "diffuse": [1,1,1], "specular": [1,1,1]},
+        // {"x": 2.5, "y": 0, "z": -0.5, "ambient": [1,1,1], "diffuse": [1,1,1], "specular": [1,1,1]}
+    ];
+    return light;
 }
 
 // draw a pixel at x,y using color
