@@ -366,31 +366,11 @@ function drawInputTrainglesUsingPaths(context) {
 
 function drawRandPixelsInInputBoxes(context) {
     var inputBoxes = getInputBoxes();
-
-    // --- FIX: Load lights directly here (no new function) ---
-    const INPUT_LIGHTS_URL = "https://ncsucgclass.github.io/prog1/lights.json";
-    var httpReq = new XMLHttpRequest();
-    httpReq.open("GET", INPUT_LIGHTS_URL, false);
-    httpReq.send(null);
-    var startTime = Date.now();
-    while ((httpReq.status !== 200) && (httpReq.readyState !== XMLHttpRequest.DONE)) {
-        if ((Date.now()-startTime) > 3000)
-            break;
-    }
-    var inputLights = null;
-    if ((httpReq.status !== 200) || (httpReq.readyState !== XMLHttpRequest.DONE)) {
-        console.log("Unable to open input lights file!");
-        inputLights = String.null;
-    } else {
-        inputLights = JSON.parse(httpReq.response);
-    }
-    // --- END FIX ---
-
     var w = context.canvas.width;
     var h = context.canvas.height;
     var imagedata = context.createImageData(w,h);
 
-    // background black
+    // initialize black background
     for (let i = 0; i < imagedata.data.length; i += 4) {
         imagedata.data[i]   = 0;
         imagedata.data[i+1] = 0;
@@ -398,24 +378,30 @@ function drawRandPixelsInInputBoxes(context) {
         imagedata.data[i+3] = 255;
     }
 
-    if (inputBoxes != String.null && inputLights != String.null) { 
+    if (inputBoxes != String.null) { 
         var n = inputBoxes.length;
-        var lights = inputLights;
-        var eye = {x:0.5, y:0.5, z:-0.5}; // camera
+        var eye = {x:0.5, y:0.5, z:-0.5};    // updated camera position
+        var light = {x:-0.5, y:1.5, z:-0.5}; // updated light position
+        var ka = 0.1, kd = 0.7, ks = 0.2, shininess = 20;
 
-        // normalize
+        // normalize vector
         function normalize(v) {
             let len = Math.sqrt(v.x*v.x + v.y*v.y + v.z*v.z);
             return {x:v.x/len, y:v.y/len, z:v.z/len};
         }
+
+        // dot product
         function dot(a,b) { return a.x*b.x + a.y*b.y + a.z*b.z; }
 
-        // loop pixels
+        // Loop over every pixel
         for (let py = 0; py < h; py++) {
             for (let px = 0; px < w; px++) {
+                
+                // normalized coords [0,1], flip y-axis
                 let ndcX = px / w;
                 let ndcY = 1 - (py / h);
 
+                // ray direction
                 let dx = ndcX - eye.x;
                 let dy = ndcY - eye.y;
                 let dz = 0 - eye.z;
@@ -427,6 +413,7 @@ function drawRandPixelsInInputBoxes(context) {
                 let hitPoint = null;
                 let hitNormal = null;
 
+                // check each box
                 for (let b=0; b<n; b++) {
                     let box = inputBoxes[b];
                     let result = rayIntersectBox(eye, {x:dx,y:dy,z:dz}, box);
@@ -439,37 +426,37 @@ function drawRandPixelsInInputBoxes(context) {
                 }
 
                 if (hitBox) {
-                    let r=0,g=0,b=0;
-                    for (let L of lights) {
-                        let lightPos = {x:L.x, y:L.y, z:L.z};
-                        let N = normalize(hitNormal);
-                        let Ldir = normalize({x:lightPos.x-hitPoint.x, y:lightPos.y-hitPoint.y, z:lightPos.z-hitPoint.z});
-                        let V = normalize({x:eye.x-hitPoint.x, y:eye.y-hitPoint.y, z:eye.z-hitPoint.z});
-                        let H = normalize({x:Ldir.x+V.x, y:Ldir.y+V.y, z:Ldir.z+V.z});
-
-                        let diff = Math.max(dot(N,Ldir),0);
-                        let spec = Math.pow(Math.max(dot(N,H),0), hitBox.n);
-
-                        let Ir = hitBox.ambient[0] + hitBox.diffuse[0]*diff + hitBox.specular[0]*spec;
-                        let Ig = hitBox.ambient[1] + hitBox.diffuse[1]*diff + hitBox.specular[1]*spec;
-                        let Ib = hitBox.ambient[2] + hitBox.diffuse[2]*diff + hitBox.specular[2]*spec;
-
-                        r += 255 * Ir;
-                        g += 255 * Ig;
-                        b += 255 * Ib;
-                    }
-
-                    let idx = (py*w + px) * 4;
-                    imagedata.data[idx]   = Math.min(255,r);
-                    imagedata.data[idx+1] = Math.min(255,g);
-                    imagedata.data[idx+2] = Math.min(255,b);
-                    imagedata.data[idx+3] = 255;
+                    // Blinn–Phong shading
+                    let N = hitNormal;
+				    let L = normalize({x:light.x-hitPoint.x, y:light.y-hitPoint.y, z:light.z-hitPoint.z});
+				    let V = normalize({x:eye.x-hitPoint.x, y:eye.y-hitPoint.y, z:eye.z-hitPoint.z});
+				    let H = normalize({x:L.x+V.x, y:L.y+V.y, z:L.z+V.z});
+				
+				    let diff = Math.max(dot(N,L),0);
+				    let spec = Math.pow(Math.max(dot(N,H),0), shininess);
+				
+				    // white light (1,1,1)
+				    let Ir = (ka + kd*diff + ks*spec);
+				    let Ig = (ka + kd*diff + ks*spec);
+				    let Ib = (ka + kd*diff + ks*spec);
+				
+				    // final color = material diffuse * light
+				    let r = hitBox.diffuse[0]*255*Ir;
+				    let g = hitBox.diffuse[1]*255*Ig;
+				    let b = hitBox.diffuse[2]*255*Ib;
+				
+				    let idx = (py*w + px) * 4;
+				    imagedata.data[idx]   = Math.min(255,r);
+				    imagedata.data[idx+1] = Math.min(255,g);
+				    imagedata.data[idx+2] = Math.min(255,b);
+				    imagedata.data[idx+3] = 255;
                 }
             }
         }
         context.putImageData(imagedata, 0, 0);
     }
 
+    // ray-box intersection with normal output
     function rayIntersectBox(rayOrigin, rayDir, box) {
         let tmin = -Infinity, tmax = Infinity;
         let hitNormal = null;
@@ -477,8 +464,13 @@ function drawRandPixelsInInputBoxes(context) {
         function checkSlab(lo, hi, origin, dir, axis) {
             let t1 = (lo - origin) / dir;
             let t2 = (hi - origin) / dir;
+            let tn = null;
             if (t1 > t2) [t1,t2] = [t2,t1];
-            return [t1,t2];
+            if (t1 > tmin && t1 > 0) {
+                tn = {x:0,y:0,z:0};
+                tn[axis] = (origin + t1*dir < lo+hi ? -1 : 1);
+            }
+            return [t1,t2,tn];
         }
 
         let tx = checkSlab(box.lx, box.rx, rayOrigin.x, rayDir.x, "x");
@@ -489,6 +481,7 @@ function drawRandPixelsInInputBoxes(context) {
         tmax = Math.min(tx[1], ty[1], tz[1]);
         if (tmax < tmin || tmax < 0) return null;
 
+        // pick normal from slab that defines tmin
         if (tmin === tx[0]) hitNormal = {x:(rayDir.x>0?-1:1), y:0, z:0};
         else if (tmin === ty[0]) hitNormal = {x:0, y:(rayDir.y>0?-1:1), z:0};
         else if (tmin === tz[0]) hitNormal = {x:0, y:0, z:(rayDir.z>0?-1:1)};
