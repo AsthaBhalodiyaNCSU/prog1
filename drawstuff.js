@@ -428,22 +428,28 @@ function drawRandPixelsInInputBoxes(context) {
                 if (hitBox) {
                     // Blinn–Phong shading
                     let N = hitNormal;
-                    let L = normalize({x:light.x-hitPoint.x, y:light.y-hitPoint.y, z:light.z-hitPoint.z});
-                    let V = normalize({x:eye.x-hitPoint.x, y:eye.y-hitPoint.y, z:eye.z-hitPoint.z});
-                    let H = normalize({x:L.x+V.x, y:L.y+V.y, z:L.z+V.z});
-
-                    let diff = Math.max(dot(N,L),0);
-                    let spec = Math.pow(Math.max(dot(N,H),0), shininess);
-
-                    let r = hitBox.diffuse[0]*255*(ka + kd*diff + ks*spec);
-                    let g = hitBox.diffuse[1]*255*(ka + kd*diff + ks*spec);
-                    let b = hitBox.diffuse[2]*255*(ka + kd*diff + ks*spec);
-
-                    let idx = (py*w + px) * 4;
-                    imagedata.data[idx]   = Math.min(255,r);
-                    imagedata.data[idx+1] = Math.min(255,g);
-                    imagedata.data[idx+2] = Math.min(255,b);
-                    imagedata.data[idx+3] = 255;
+				    let L = normalize({x:light.x-hitPoint.x, y:light.y-hitPoint.y, z:light.z-hitPoint.z});
+				    let V = normalize({x:eye.x-hitPoint.x, y:eye.y-hitPoint.y, z:eye.z-hitPoint.z});
+				    let H = normalize({x:L.x+V.x, y:L.y+V.y, z:L.z+V.z});
+				
+				    let diff = Math.max(dot(N,L),0);
+				    let spec = Math.pow(Math.max(dot(N,H),0), shininess);
+				
+				    // white light (1,1,1)
+				    let Ir = (ka + kd*diff + ks*spec);
+				    let Ig = (ka + kd*diff + ks*spec);
+				    let Ib = (ka + kd*diff + ks*spec);
+				
+				    // final color = material diffuse * light
+				    let r = hitBox.diffuse[0]*255*Ir;
+				    let g = hitBox.diffuse[1]*255*Ig;
+				    let b = hitBox.diffuse[2]*255*Ib;
+				
+				    let idx = (py*w + px) * 4;
+				    imagedata.data[idx]   = Math.min(255,r);
+				    imagedata.data[idx+1] = Math.min(255,g);
+				    imagedata.data[idx+2] = Math.min(255,b);
+				    imagedata.data[idx+3] = 255;
                 }
             }
         }
