@@ -441,30 +441,72 @@ function drawRandPixelsInInputBoxes(context) {
     }
 
     if (inputBoxes != String.null) { 
-        var lx=0, rx=0, by=0, ty=0;
-        var c = new Color(0,0,0,0); 
         var n = inputBoxes.length;
+        var eye = {x:0.5, y:0.5, z:-1.0}; // camera at center, looking forward
 
-        for (var b=0; b<n; b++) {
-            lx = Math.floor(w * inputBoxes[b].lx);
-            rx = Math.floor(w * inputBoxes[b].rx);
-            by = Math.floor(h * inputBoxes[b].by);
-            ty = Math.floor(h * inputBoxes[b].ty);
+        // Loop over every pixel
+        for (let py = 0; py < h; py++) {
+            for (let px = 0; px < w; px++) {
+                
+                // convert to normalized [0,1], flip y-axis
+                let ndcX = px / w;
+                let ndcY = 1 - (py / h);
 
-            c.change(
-                inputBoxes[b].diffuse[0]*255,
-                inputBoxes[b].diffuse[1]*255,
-                inputBoxes[b].diffuse[2]*255,
-                255);
+                // ray direction from eye through pixel
+                let dx = ndcX - eye.x;
+                let dy = ndcY - eye.y;
+                let dz = 0 - eye.z; 
+                let len = Math.sqrt(dx*dx + dy*dy + dz*dz);
+                dx /= len; dy /= len; dz /= len;
 
-            // fill every pixel inside the box
-            for (let y = by; y <= ty; y++) {
-                for (let x = lx; x <= rx; x++) {
-                    drawPixel(imagedata, x, y, c);
+                let closestT = Infinity;
+                let hitColor = null;
+
+                // test against each box
+                for (let b=0; b<n; b++) {
+                    let box = inputBoxes[b];
+                    let t = rayIntersectBox(eye, {x:dx,y:dy,z:dz}, box);
+                    if (t !== null && t < closestT) {
+                        closestT = t;
+                        hitColor = box.diffuse;
+                    }
+                }
+
+                if (hitColor) {
+                    let idx = (py*w + px) * 4;
+                    imagedata.data[idx]   = Math.floor(hitColor[0]*255);
+                    imagedata.data[idx+1] = Math.floor(hitColor[1]*255);
+                    imagedata.data[idx+2] = Math.floor(hitColor[2]*255);
+                    imagedata.data[idx+3] = 255;
                 }
             }
         }
         context.putImageData(imagedata, 0, 0);
+    }
+
+    // helper: ray-box intersection
+    function rayIntersectBox(rayOrigin, rayDir, box) {
+        let tmin = (box.lx - rayOrigin.x) / rayDir.x;
+        let tmax = (box.rx - rayOrigin.x) / rayDir.x;
+        if (tmin > tmax) [tmin, tmax] = [tmax, tmin];
+
+        let tymin = (box.by - rayOrigin.y) / rayDir.y;
+        let tymax = (box.ty - rayOrigin.y) / rayDir.y;
+        if (tymin > tymax) [tymin, tymax] = [tymax, tymin];
+
+        if ((tmin > tymax) || (tymin > tmax)) return null;
+        if (tymin > tmin) tmin = tymin;
+        if (tymax < tmax) tmax = tymax;
+
+        let tzmin = (box.fz - rayOrigin.z) / rayDir.z;
+        let tzmax = (box.rz - rayOrigin.z) / rayDir.z;
+        if (tzmin > tzmax) [tzmin, tzmax] = [tzmax, tzmin];
+
+        if ((tmin > tzmax) || (tzmin > tmax)) return null;
+        if (tzmin > tmin) tmin = tzmin;
+        if (tzmax < tmax) tmax = tzmax;
+
+        return tmin >= 0 ? tmin : null;
     }
 }
 
