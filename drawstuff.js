@@ -382,7 +382,7 @@ function drawRandPixelsInInputBoxes(context) {
         var n = inputBoxes.length;
         var eye = {x:0.5, y:0.5, z:-0.5};    // updated camera position
         var light = {x:-0.5, y:1.5, z:-0.5}; // updated light position
-        var ka = 0.1, kd = 0.7, ks = 0.2, shininess = 20;
+        var ka = 0.3, kd = 0.7, ks = 0.2, shininess = 32;
 
         // normalize vector
         function normalize(v) {
