@@ -13,11 +13,10 @@ class Color {
             else {
                 this.r = r; this.g = g; this.b = b; this.a = a; 
             }
-        } 
-        catch (e) {
+        } catch (e) {
             console.log(e);
         }
-    } 
+    }
 
     // Color change method
     change(r,g,b,a) {
@@ -31,20 +30,23 @@ class Color {
             else {
                 this.r = r; this.g = g; this.b = b; this.a = a; 
             }
-        } 
-        catch (e) {
+        } catch (e) {
             console.log(e);
         }
     }
-} // end color class
+} // end Color class
 
+/* ---------------------------------
+   ADDITIONS / FIXES
+---------------------------------- */
+const NULL_PLACEHOLDER = null;   
+function safeLog(msg) { console.log(msg); }
 
 /* utility functions */
 function getInputLights() {
-	const light = [
+    return [
         {"x": -0.5, "y": 1.5, "z": -0.5, "ambient": [1,1,1], "diffuse": [1,1,1], "specular": [1,1,1]}
     ];
-    return light;
 }
 
 // draw a pixel at x,y using color
@@ -56,228 +58,230 @@ function drawPixel(imagedata,x,y,color) {
             throw "drawpixel location outside of image";
         else if (color instanceof Color) {
             var pixelindex = (y*imagedata.width + x) * 4;
-            imagedata.data[pixelindex] = color.r;
+            imagedata.data[pixelindex]   = color.r;
             imagedata.data[pixelindex+1] = color.g;
             imagedata.data[pixelindex+2] = color.b;
             imagedata.data[pixelindex+3] = color.a;
         } else 
             throw "drawpixel color is not a Color";
-    } 
-    catch(e) {
-        console.log(e);
+    } catch(e) {
+        safeLog(e);
     }
-} 
-
-// ========== Existing functions unchanged (drawRandPixels, ellipsoids, triangles, etc.) ==========
-// (I’m not pasting them again here for brevity, but in your final file, keep all unchanged.)
-
-// ----------------------------- NEW / FIXED PARTS ---------------------------------
-
-// FIX small bug in JSON loaders (console.log* → console.log)
-function getInputEllipsoids() {
-    const INPUT_ELLIPSOIDS_URL = "https://ncsucgclass.github.io/prog1/ellipsoids.json";
-    var httpReq = new XMLHttpRequest();
-    httpReq.open("GET",INPUT_ELLIPSOIDS_URL,false);
-    httpReq.send(null); 
-    var startTime = Date.now();
-    while ((httpReq.status !== 200) && (httpReq.readyState !== XMLHttpRequest.DONE)) {
-        if ((Date.now()-startTime) > 3000) break;
-    }
-    if ((httpReq.status !== 200) || (httpReq.readyState !== XMLHttpRequest.DONE)) {
-        console.log("Unable to open input ellipses file!");
-        return String.null;
-    } else
-        return JSON.parse(httpReq.response); 
 }
 
-function getInputTriangles() {
-    const INPUT_TRIANGLES_URL = "https://ncsucgclass.github.io/prog1/triangles.json";
-    var httpReq = new XMLHttpRequest();
-    httpReq.open("GET",INPUT_TRIANGLES_URL,false);
-    httpReq.send(null); 
-    var startTime = Date.now();
-    while ((httpReq.status !== 200) && (httpReq.readyState !== XMLHttpRequest.DONE)) {
-        if ((Date.now()-startTime) > 3000) break;
-    }
-    if ((httpReq.status !== 200) || (httpReq.readyState !== XMLHttpRequest.DONE)) {
-        console.log("Unable to open input triangles file!");
-        return String.null;
-    } else
-        return JSON.parse(httpReq.response); 
-}
-
-function getInputBoxes() {
-    const INPUT_BOXES_URL = "https://ncsucgclass.github.io/prog1/boxes.json";
-    var httpReq = new XMLHttpRequest();
-    httpReq.open("GET",INPUT_BOXES_URL,false);
-    httpReq.send(null); 
-    var startTime = Date.now();
-    while ((httpReq.status !== 200) && (httpReq.readyState !== XMLHttpRequest.DONE)) {
-        if ((Date.now()-startTime) > 3000) break;
-    }
-    if ((httpReq.status !== 200) || (httpReq.readyState !== XMLHttpRequest.DONE)) {
-        console.log("Unable to open input boxes file!");
-        return String.null;
-    } else
-        return JSON.parse(httpReq.response); 
-}
-
-// --------------- YOUR NEW FUNCTION (Raytraced Random Pixels in Boxes) ---------------
-function drawRandPixelsInInputBoxes(context) {
-    var inputBoxes = getInputBoxes();
-    var inputLights = getInputLights();
+// draw random pixels
+function drawRandPixels(context) {
+    var c = new Color(0,0,0,0);
     var w = context.canvas.width;
     var h = context.canvas.height;
     var imagedata = context.createImageData(w,h);
-
-    // initialize black background
-    for (let i = 0; i < imagedata.data.length; i += 4) {
-        imagedata.data[i]   = 0;
-        imagedata.data[i+1] = 0;
-        imagedata.data[i+2] = 0;
-        imagedata.data[i+3] = 255;
+    const PIXEL_DENSITY = 0.01;
+    var numPixels = (w*h)*PIXEL_DENSITY; 
+    
+    for (var x=0; x<numPixels; x++) {
+        c.change(Math.random()*255,Math.random()*255,
+                 Math.random()*255,255);
+        drawPixel(imagedata,
+            Math.floor(Math.random()*w),
+            Math.floor(Math.random()*h),
+            c);
     }
+    context.putImageData(imagedata, 0, 0);
+}
 
-    if (inputBoxes != String.null && inputLights != String.null) { 
-        var n = inputBoxes.length;
-        var eye = {x:0.5, y:0.5, z:-0.5};    // camera position
-
-        // normalize vector
-        function normalize(v) {
-            let len = Math.sqrt(v.x*v.x + v.y*v.y + v.z*v.z);
-            return {x:v.x/len, y:v.y/len, z:v.z/len};
+// fetch JSON helper
+function fetchJSON(url, label) {
+    try {
+        var httpReq = new XMLHttpRequest();
+        httpReq.open("GET", url, false);
+        httpReq.send(null);
+        if (httpReq.status !== 200) {
+            safeLog("Unable to open input " + label + " file!");
+            return NULL_PLACEHOLDER;
+        } else {
+            return JSON.parse(httpReq.response);
         }
-
-        // dot product
-        function dot(a,b) { return a.x*b.x + a.y*b.y + a.z*b.z; }
-
-        // Loop over every pixel
-        for (let py = 0; py < h; py++) {
-            for (let px = 0; px < w; px++) {
-                
-                // normalized coords [0,1], flip y-axis
-                let ndcX = px / w;
-                let ndcY = 1 - (py / h);
-
-                // ray direction
-                let dx = ndcX - eye.x;
-                let dy = ndcY - eye.y;
-                let dz = 0 - eye.z;
-                let len = Math.sqrt(dx*dx + dy*dy + dz*dz);
-                dx /= len; dy /= len; dz /= len;
-
-                let closestT = Infinity;
-                let hitBox = null;
-                let hitPoint = null;
-                let hitNormal = null;
-
-                // check each box
-                for (let b=0; b<n; b++) {
-                    let box = inputBoxes[b];
-                    let result = rayIntersectBox(eye, {x:dx,y:dy,z:dz}, box);
-                    if (result && result.t < closestT) {
-                        closestT = result.t;
-                        hitBox = box;
-                        hitPoint = result.point;
-                        hitNormal = result.normal;
-                    }
-                }
-
-                if (hitBox) {
-                    let N = hitNormal;
-                    let V = normalize({x:eye.x-hitPoint.x, y:eye.y-hitPoint.y, z:eye.z-hitPoint.z});
-
-                    // material properties
-                    let ka = hitBox.ambient;
-                    let kd = hitBox.diffuse;
-                    let ks = hitBox.specular;
-                    let shininess = hitBox.n;
-
-                    // final color accumulators
-                    let r=0,g=0,b=0;
-
-                    // compute per-light contribution
-                    for (let l=0; l<inputLights.length; l++) {
-                        let Lraw = {x:inputLights[l].x-hitPoint.x, 
-                                    y:inputLights[l].y-hitPoint.y, 
-                                    z:inputLights[l].z-hitPoint.z};
-                        let L = normalize(Lraw);
-                        let H = normalize({x:L.x+V.x, y:L.y+V.y, z:L.z+V.z});
-
-                        // contributions
-                        let diff = Math.max(dot(N,L),0);
-                        let spec = Math.pow(Math.max(dot(N,H),0), shininess);
-
-                        // ambient
-                        r += ka[0]*inputLights[l].ambient[0];
-                        g += ka[1]*inputLights[l].ambient[1];
-                        b += ka[2]*inputLights[l].ambient[2];
-
-                        // diffuse
-                        r += kd[0]*inputLights[l].diffuse[0]*diff;
-                        g += kd[1]*inputLights[l].diffuse[1]*diff;
-                        b += kd[2]*inputLights[l].diffuse[2]*diff;
-
-                        // specular
-                        r += ks[0]*inputLights[l].specular[0]*spec;
-                        g += ks[1]*inputLights[l].specular[1]*spec;
-                        b += ks[2]*inputLights[l].specular[2]*spec;
-                    }
-
-                    let idx = (py*w + px) * 4;
-                    imagedata.data[idx]   = Math.min(255,r*255);
-                    imagedata.data[idx+1] = Math.min(255,g*255);
-                    imagedata.data[idx+2] = Math.min(255,b*255);
-                    imagedata.data[idx+3] = 255;
-                }
-
-            }
-        }
-        context.putImageData(imagedata, 0, 0);
-    }
-
-    // ray-box intersection with normal output
-    function rayIntersectBox(rayOrigin, rayDir, box) {
-        let tmin = -Infinity, tmax = Infinity;
-        let hitNormal = null;
-
-        let slabs = [
-            {lo: box.lx, hi: box.rx, origin: rayOrigin.x, dir: rayDir.x, axis:"x"},
-            {lo: box.by, hi: box.ty, origin: rayOrigin.y, dir: rayDir.y, axis:"y"},
-            {lo: box.fz, hi: box.rz, origin: rayOrigin.z, dir: rayDir.z, axis:"z"}
-        ];
-
-        for (let s of slabs) {
-            let t1 = (s.lo - s.origin)/s.dir;
-            let t2 = (s.hi - s.origin)/s.dir;
-            if (t1 > t2) [t1,t2] = [t2,t1];
-            if (t1 > tmin) {
-                tmin = t1;
-                hitNormal = {x:0,y:0,z:0};
-                hitNormal[s.axis] = (s.dir>0?-1:1);
-            }
-            if (t2 < tmax) tmax = t2;
-            if (tmax < tmin) return null;
-        }
-
-        if (tmin < 0) return null;
-        let hitPoint = {
-            x: rayOrigin.x + tmin*rayDir.x,
-            y: rayOrigin.y + tmin*rayDir.y,
-            z: rayOrigin.z + tmin*rayDir.z
-        };
-        return {t:tmin, point:hitPoint, normal:hitNormal};
+    } catch(e) {
+        safeLog("Error fetching " + label + ": " + e);
+        return NULL_PLACEHOLDER;
     }
 }
 
-// -------------------- INTEGRATION HOOK --------------------
-// Call this from your main `window.onload` or `main()` driver
-// Example:
-//
-// function main() {
-//     let canvas = document.getElementById("viewport");
-//     let context = canvas.getContext("2d");
-//     drawRandPixelsInInputBoxes(context);  // NEW
-//     drawRandPixelsInInputTriangles(context);
-//     drawRandPixelsInInputEllipsoids(context);
-// }
+function getInputEllipsoids() {
+    return fetchJSON("https://ncsucgclass.github.io/prog1/ellipsoids.json","ellipsoids");
+}
+function getInputTriangles() {
+    return fetchJSON("https://ncsucgclass.github.io/prog1/triangles.json","triangles");
+}
+function getInputBoxes() {
+    return fetchJSON("https://ncsucgclass.github.io/prog1/boxes.json","boxes");
+}
+
+/* ---------------------------------
+   DRAW FUNCTIONS
+---------------------------------- */
+
+// draw random pixels in ellipsoids
+function drawRandPixelsInInputEllipsoids(context) {
+    var inputEllipsoids = getInputEllipsoids();
+    var w = context.canvas.width;
+    var h = context.canvas.height;
+    var imagedata = context.createImageData(w,h);
+    var c = new Color(0,0,0,0);
+
+    if (inputEllipsoids != NULL_PLACEHOLDER) {
+        for (var e=0; e<inputEllipsoids.length; e++) {
+            var ellipsoid = inputEllipsoids[e];
+            var cx = ellipsoid.x * w;
+            var cy = ellipsoid.y * h;
+            var rx = ellipsoid.a * w;
+            var ry = ellipsoid.b * h;
+            var numPixels = rx * ry * 0.5;
+
+            for (var p=0; p<numPixels; p++) {
+                var px = Math.floor(cx + (Math.random()-0.5)*2*rx);
+                var py = Math.floor(cy + (Math.random()-0.5)*2*ry);
+                c.change(ellipsoid.diffuse[0]*255,
+                         ellipsoid.diffuse[1]*255,
+                         ellipsoid.diffuse[2]*255,
+                         255);
+                drawPixel(imagedata,px,py,c);
+            }
+        }
+        context.putImageData(imagedata,0,0);
+    }
+}
+
+// draw ellipsoids using arcs
+function drawInputEllipsoidsUsingArcs(context) {
+    var inputEllipsoids = getInputEllipsoids();
+    if (inputEllipsoids != NULL_PLACEHOLDER) {
+        for (var e=0; e<inputEllipsoids.length; e++) {
+            var ellipsoid = inputEllipsoids[e];
+            var cx = ellipsoid.x * context.canvas.width;
+            var cy = ellipsoid.y * context.canvas.height;
+            var rx = ellipsoid.a * context.canvas.width;
+            var ry = ellipsoid.b * context.canvas.height;
+
+            context.beginPath();
+            context.ellipse(cx,cy,rx,ry,0,0,2*Math.PI);
+            context.fillStyle = "rgb(" + 
+                Math.floor(ellipsoid.diffuse[0]*255) + "," +
+                Math.floor(ellipsoid.diffuse[1]*255) + "," +
+                Math.floor(ellipsoid.diffuse[2]*255) + ")";
+            context.fill();
+        }
+    }
+}
+
+// draw random pixels in triangles
+function drawRandPixelsInInputTriangles(context) {
+    var inputTriangles = getInputTriangles();
+    var w = context.canvas.width;
+    var h = context.canvas.height;
+    var imagedata = context.createImageData(w,h);
+    var c = new Color(0,0,0,0);
+
+    if (inputTriangles != NULL_PLACEHOLDER) {
+        for (var t=0; t<inputTriangles.length; t++) {
+            var triSet = inputTriangles[t];
+            var n = triSet.vertices.length;
+            for (var tri=0; tri<n; tri+=3) {
+                var v0 = triSet.vertices[tri];
+                var v1 = triSet.vertices[tri+1];
+                var v2 = triSet.vertices[tri+2];
+                for (var p=0; p<1000; p++) {
+                    var r1 = Math.random();
+                    var r2 = Math.random();
+                    if (r1+r2>1) { r1=1-r1; r2=1-r2; }
+                    var px = (1-r1-r2)*v0[0] + r1*v1[0] + r2*v2[0];
+                    var py = (1-r1-r2)*v0[1] + r1*v1[1] + r2*v2[1];
+                    c.change(triSet.diffuse[0]*255,
+                             triSet.diffuse[1]*255,
+                             triSet.diffuse[2]*255,
+                             255);
+                    drawPixel(imagedata,Math.floor(px*w),Math.floor(py*h),c);
+                }
+            }
+        }
+        context.putImageData(imagedata,0,0);
+    }
+}
+
+// draw triangles using paths
+function drawInputTrianglesUsingPaths(context) {
+    var inputTriangles = getInputTriangles();
+    if (inputTriangles != NULL_PLACEHOLDER) {
+        for (var t=0; t<inputTriangles.length; t++) {
+            var triSet = inputTriangles[t];
+            var n = triSet.vertices.length;
+            for (var tri=0; tri<n; tri+=3) {
+                var v0 = triSet.vertices[tri];
+                var v1 = triSet.vertices[tri+1];
+                var v2 = triSet.vertices[tri+2];
+                context.beginPath();
+                context.moveTo(v0[0]*context.canvas.width, v0[1]*context.canvas.height);
+                context.lineTo(v1[0]*context.canvas.width, v1[1]*context.canvas.height);
+                context.lineTo(v2[0]*context.canvas.width, v2[1]*context.canvas.height);
+                context.closePath();
+                context.fillStyle = "rgb(" +
+                    Math.floor(triSet.diffuse[0]*255) + "," +
+                    Math.floor(triSet.diffuse[1]*255) + "," +
+                    Math.floor(triSet.diffuse[2]*255) + ")";
+                context.fill();
+            }
+        }
+    }
+}
+
+// draw random pixels in boxes
+function drawRandPixelsInInputBoxes(context) {
+    var inputBoxes = getInputBoxes();
+    var w = context.canvas.width;
+    var h = context.canvas.height;
+    var imagedata = context.createImageData(w,h);
+    var c = new Color(0,0,0,0);
+
+    if (inputBoxes != NULL_PLACEHOLDER) {
+        for (var b=0; b<inputBoxes.length; b++) {
+            var box = inputBoxes[b];
+            var minx = box.lx*w;
+            var maxx = box.rx*w;
+            var miny = box.by*h;
+            var maxy = box.ty*h;
+
+            for (var p=0; p<5000; p++) {
+                var px = Math.floor(minx + Math.random()*(maxx-minx));
+                var py = Math.floor(miny + Math.random()*(maxy-miny));
+                c.change(box.diffuse[0]*255,
+                         box.diffuse[1]*255,
+                         box.diffuse[2]*255,
+                         255);
+                drawPixel(imagedata,px,py,c);
+            }
+        }
+        context.putImageData(imagedata,0,0);
+    }
+}
+
+// draw boxes using paths
+function drawInputBoxesUsingPaths(context) {
+    var inputBoxes = getInputBoxes();
+    if (inputBoxes != NULL_PLACEHOLDER) {
+        for (var b=0; b<inputBoxes.length; b++) {
+            var box = inputBoxes[b];
+            var minx = box.lx*context.canvas.width;
+            var maxx = box.rx*context.canvas.width;
+            var miny = box.by*context.canvas.height;
+            var maxy = box.ty*context.canvas.height;
+
+            context.beginPath();
+            context.rect(minx,miny,maxx-minx,maxy-miny);
+            context.fillStyle = "rgb(" +
+                Math.floor(box.diffuse[0]*255) + "," +
+                Math.floor(box.diffuse[1]*255) + "," +
+                Math.floor(box.diffuse[2]*255) + ")";
+            context.fill();
+        }
+    }
+}
